@@ -2,7 +2,7 @@
  * @name Paranoia
  * @author TetteDev
  * @description A maintained/updated version of the now abandoned DoNotTrack plugin by Zerebos. This plugin will attempt to block as much tracking as possible.
- * @version 0.0.7
+ * @version 0.0.8
  * @source https://github.com/TetteDev/Paranoia
  */
 
@@ -242,7 +242,7 @@ module.exports = class Paranoia {
         if (this.featureToggles.network.fetch === true) {
             BdApi.Patcher.instead(this.pluginID, window, "fetch", (thisObject, args, originalFunction) => {
                 try {
-                    const [url, options] = args;
+                    const url = typeof args[0] === 'string' ? args[0] /* fetch was called with a string as the url */ : args[0].url /* fetch was called with a Request object */;
                     const urlString = this.normalizeURL(url);
                     this.verboseLog(()=>`fetch called with URL: ${urlString}`);
 
@@ -267,7 +267,7 @@ module.exports = class Paranoia {
         if (this.featureToggles.network.fetchLater === true && typeof window.fetchLater === 'function') {
             BdApi.Patcher.instead(this.pluginID, window, "fetchLater", (thisObject, args, originalFunction) => {
                 try {
-                    const [url, options] = args;
+                    const url = args[0];
                     const urlString = this.normalizeURL(url);
                     this.verboseLog(()=>`fetchLater called with URL: ${urlString}`);
 
@@ -345,7 +345,7 @@ module.exports = class Paranoia {
         if (this.featureToggles.network.sendBeacon === true) {
             BdApi.Patcher.instead(this.pluginID, Navigator.prototype, "sendBeacon", (thisObject, args, originalFunction) => {
                 try {
-                    const [url, data] = args;
+                    const url = args[0];
                     const urlString = this.normalizeURL(url);
                     this.verboseLog(()=>`sendBeacon called with URL: ${urlString}`);
                     
@@ -585,6 +585,9 @@ module.exports = class Paranoia {
         return isMatch;
     }
 
+    // FIXME: still allocates a closure for the log message, which is better than what we had before but still not ideal
+    // a zero overhead solution would be to inline check if verbose mode is enabled and then proceed to construct our 
+    // message and log it, its a little bit less elegant but it would avoid unnecessary allocations
     verboseLog(lazyMessageFn) {
         // NOTE: should we override this function with a no-op if verbose mode is disabled?
 
