@@ -2,7 +2,7 @@
  * @name Paranoia
  * @author TetteDev
  * @description A maintained/updated version of the now abandoned DoNotTrack plugin by Zerebos. This plugin will attempt to block as much tracking as possible.
- * @version 0.1.0
+ * @version 0.1.1
  * @source https://github.com/TetteDev/Paranoia
  */
 
@@ -307,11 +307,16 @@ module.exports = class Paranoia {
                         thisObject.__schizophreniaMethod = method;
                         thisObject.send = (body) => {
                             BdApi.Logger.warn(this.pluginID, `Blocked XHR: ${thisObject.__schizophreniaMethod} ${thisObject.__schizophreniaURL}`);
-                            thisObject.abort();
-                            setTimeout(() => {
-                                const errorEvent = new ProgressEvent('error');
-                                thisObject.dispatchEvent(errorEvent);
-                            }, 16);
+                            
+                            const fire = (type) => thisObject.dispatchEvent(
+                                new ProgressEvent(type, { bubbles: false, cancelable: false, loaded: 0, total: 0 })
+                            );
+                            
+                            // NOTE: we need to fire these events in order to properly trigger any onload/onerror handlers that may be attached to the XHR object, otherwise we might cause issues with the app if it expects those events to be fired
+                            // only downside is that this xhrs readystate will never change to 4 (done)
+                            fire('loadstart');
+                            fire('error');
+                            fire('loadend');
                         };
                     }
                     else {
