@@ -2,20 +2,20 @@
  * @name Paranoia
  * @author TetteDev
  * @description A maintained/updated version of the now abandoned DoNotTrack plugin by Zerebos. This plugin will attempt to block as much tracking as possible.
- * @version 0.0.2
+ * @version 0.0.3
  * @source https://github.com/TetteDev/Paranoia
  */
 
 module.exports = class Paranoia {
-    #pluginID = null;
-    #trackingCache = null;
-    #defaultSettings = null;
+    pluginID = null;
+    trackingCache = null;
+    defaultSettings = null;
 
     constructor(meta) {
-        this.#pluginID = meta.name;
-        this.#trackingCache = new Map();
+        this.pluginID = meta.name;
+        this.trackingCache = new Map();
 
-        this.#defaultSettings = {
+        this.defaultSettings = {
             verboseMode: false, // be bombarded with logs
 
             cacheMaxSize: 256, // -1 for unbounded, or set a positive integer for max cache size
@@ -50,22 +50,22 @@ module.exports = class Paranoia {
     }
 
     loadSettings() {
-        const saved = BdApi.Data.load(this.#pluginID, "settings");
+        const saved = BdApi.Data.load(this.pluginID, "settings");
         if (saved) {
             return {
-                ...this.#defaultSettings,
+                ...this.defaultSettings,
                 ...saved,
                 featureToggles: {
-                    network: { ...this.#defaultSettings.featureToggles.network, ...saved.featureToggles?.network },
-                    sentry: { ...this.#defaultSettings.featureToggles.sentry, ...saved.featureToggles?.sentry },
-                    misc: { ...this.#defaultSettings.featureToggles.misc, ...saved.featureToggles?.misc }
+                    network: { ...this.defaultSettings.featureToggles.network, ...saved.featureToggles?.network },
+                    sentry: { ...this.defaultSettings.featureToggles.sentry, ...saved.featureToggles?.sentry },
+                    misc: { ...this.defaultSettings.featureToggles.misc, ...saved.featureToggles?.misc }
                 }
             };
         }
-        return this.#defaultSettings;
+        return this.defaultSettings;
     }
     saveSettings() {
-        BdApi.Data.save(this.#pluginID, "settings", this.settings);
+        BdApi.Data.save(this.pluginID, "settings", this.settings);
         this.verboseMode = this.settings.verboseMode;
         this.featureToggles = this.settings.featureToggles;
     }
@@ -202,7 +202,7 @@ module.exports = class Paranoia {
                 
                 this.saveSettings();
                 
-                BdApi.Logger.info(this.#pluginID, `Setting changed: ${category ? category + '.' : ''}${id} = ${value}`);
+                BdApi.Logger.info(this.pluginID, `Setting changed: ${category ? category + '.' : ''}${id} = ${value}`);
                 
                 // TODO: any sentry related changes probably dont need a restart, but why the hell not
                 // if (id === "sentry.enabled") {
@@ -215,17 +215,17 @@ module.exports = class Paranoia {
     }
 
     start() {
-        BdApi.Logger.info(this.#pluginID, 'Started Plugin');
+        BdApi.Logger.info(this.pluginID, 'Started Plugin');
 
         this.overrideNetworking();
         this.overrideSentry();
         this.overrideMisc();
     }
     stop() {
-        BdApi.Patcher.unpatchAll(this.#pluginID);
-        this.#trackingCache.clear();
+        BdApi.Patcher.unpatchAll(this.pluginID);
+        this.trackingCache.clear();
 
-        BdApi.Logger.info(this.#pluginID, `Stopped Plugin`);
+        BdApi.Logger.info(this.pluginID, `Stopped Plugin`);
     }
 
     overrideNetworking() {
@@ -236,7 +236,7 @@ module.exports = class Paranoia {
 
         // NOTE: handle fetch
         if (this.featureToggles.network.fetch === true) {
-            BdApi.Patcher.instead(this.#pluginID, window, "fetch", (thisObject, args, originalFunction) => {
+            BdApi.Patcher.instead(this.pluginID, window, "fetch", (thisObject, args, originalFunction) => {
                 try {
                     const [url, options] = args;
                     const urlString = this.normalizeURL(url);
@@ -244,7 +244,7 @@ module.exports = class Paranoia {
 
                     const isTracking = this.isTrackingRequest(urlString);
                     if (isTracking) {
-                        BdApi.Logger.warn(this.#pluginID, `Blocked fetch: ${urlString}`);
+                        BdApi.Logger.warn(this.pluginID, `Blocked fetch: ${urlString}`);
                         return Promise.reject(new Error("Blocked tracking request"));
                     }
                     else {
@@ -252,7 +252,7 @@ module.exports = class Paranoia {
                         return originalFunction.apply(thisObject, args);
                     }
                 } catch (error) {
-                    BdApi.Logger.error(this.#pluginID, "Error in fetch patch:", error);
+                    BdApi.Logger.error(this.pluginID, "Error in fetch patch:", error);
                     return originalFunction.apply(thisObject, args);
                 }
             });
@@ -261,7 +261,7 @@ module.exports = class Paranoia {
 
         // NOTE: handle fetchLater
         if (this.featureToggles.network.fetchLater === true && typeof window.fetchLater === 'function') {
-            BdApi.Patcher.instead(this.#pluginID, window, "fetchLater", (thisObject, args, originalFunction) => {
+            BdApi.Patcher.instead(this.pluginID, window, "fetchLater", (thisObject, args, originalFunction) => {
                 try {
                     const [url, options] = args;
                     const urlString = this.normalizeURL(url);
@@ -269,7 +269,7 @@ module.exports = class Paranoia {
 
                     const isTracking = this.isTrackingRequest(urlString);
                     if (isTracking) {
-                        BdApi.Logger.warn(this.#pluginID, `Blocked fetchLater: ${urlString}`);
+                        BdApi.Logger.warn(this.pluginID, `Blocked fetchLater: ${urlString}`);
                         return Promise.reject(new Error("Blocked tracking request"));
                     }
                     else {
@@ -277,7 +277,7 @@ module.exports = class Paranoia {
                         return originalFunction.apply(thisObject, args);
                     }
                 } catch (error) {
-                    BdApi.Logger.error(this.#pluginID, "Error in fetchLater patch:", error);
+                    BdApi.Logger.error(this.pluginID, "Error in fetchLater patch:", error);
                     return originalFunction.apply(thisObject, args);
                 }
             });
@@ -290,7 +290,7 @@ module.exports = class Paranoia {
             // those should probably also be checked for 
 
             // XMLHttpRequest.open - Mark blocked requests
-            BdApi.Patcher.before(this.#pluginID, XMLHttpRequest.prototype, "open", (thisObject, args) => {
+            BdApi.Patcher.before(this.pluginID, XMLHttpRequest.prototype, "open", (thisObject, args) => {
                 try {
                     const [method, url] = args;
                     const urlString = this.normalizeURL(url);
@@ -301,22 +301,22 @@ module.exports = class Paranoia {
                         thisObject.__schizophreniaBlocked = true;
                         thisObject.__schizophreniaURL = urlString;
                         thisObject.__schizophreniaMethod = method;
-                        BdApi.Logger.warn(this.#pluginID, `Marked XHR for blocking: ${method} ${urlString}`);
+                        BdApi.Logger.warn(this.pluginID, `Marked XHR for blocking: ${method} ${urlString}`);
                     }
                     else {
                         this.verboseLog(`Allowed XHR: ${method} ${urlString}`);
                     }
                 } catch (error) {
-                    BdApi.Logger.error(this.#pluginID, "Error in XHR open patch:", error);
+                    BdApi.Logger.error(this.pluginID, "Error in XHR open patch:", error);
                 }
             });
             this.verboseLog("XHR open patch applied");
 
             // XMLHttpRequest.send - Block marked requests
-            BdApi.Patcher.instead(this.#pluginID, XMLHttpRequest.prototype, "send", (thisObject, args, originalFunction) => {
+            BdApi.Patcher.instead(this.pluginID, XMLHttpRequest.prototype, "send", (thisObject, args, originalFunction) => {
                 try {
                     if (thisObject.__schizophreniaBlocked) {
-                        BdApi.Logger.warn(this.#pluginID, `Blocked XHR: ${thisObject.__schizophreniaMethod} ${thisObject.__schizophreniaURL}`);
+                        BdApi.Logger.warn(this.pluginID, `Blocked XHR: ${thisObject.__schizophreniaMethod} ${thisObject.__schizophreniaURL}`);
                         
                         // Simulate network error
                         setTimeout(() => {
@@ -330,7 +330,7 @@ module.exports = class Paranoia {
                         return originalFunction.apply(thisObject, args);
                     }
                 } catch (error) {
-                    BdApi.Logger.error(this.#pluginID, "Error in XHR send patch:", error);
+                    BdApi.Logger.error(this.pluginID, "Error in XHR send patch:", error);
                     return originalFunction.apply(thisObject, args);
                 }
             });
@@ -339,20 +339,20 @@ module.exports = class Paranoia {
         
         // NOTE: handle SendBeacon
         if (this.featureToggles.network.sendBeacon === true) {
-            BdApi.Patcher.instead(this.#pluginID, Navigator.prototype, "sendBeacon", (thisObject, args, originalFunction) => {
+            BdApi.Patcher.instead(this.pluginID, Navigator.prototype, "sendBeacon", (thisObject, args, originalFunction) => {
                 try {
                     const [url, data] = args;
                     const urlString = this.normalizeURL(url);
                     this.verboseLog(`sendBeacon called with URL: ${urlString}`);
                     
                     if (this.isTrackingRequest(urlString)) {
-                        BdApi.Logger.warn(this.#pluginID, `Blocked sendBeacon: ${urlString}`);
+                        BdApi.Logger.warn(this.pluginID, `Blocked sendBeacon: ${urlString}`);
                         return false;
                     }
                     
                     return originalFunction.apply(thisObject, args);
                 } catch (error) {
-                    BdApi.Logger.error(this.#pluginID, "Error in sendBeacon patch:", error);
+                    BdApi.Logger.error(this.pluginID, "Error in sendBeacon patch:", error);
                     return originalFunction.apply(thisObject, args);
                 }
             });
@@ -429,8 +429,8 @@ module.exports = class Paranoia {
 
             const Analytics = BdApi.Webpack.getByKeys("AnalyticEventConfigs");
             if (Analytics?.default?.track) {
-                BdApi.Patcher.instead(this.#pluginID, Analytics.default, "track", (thisObject, args, originalFunction) => {
-                    BdApi.Logger.warn(this.#pluginID, "Blocked Analytics.track call with arguments:", args);
+                BdApi.Patcher.instead(this.pluginID, Analytics.default, "track", (thisObject, args, originalFunction) => {
+                    BdApi.Logger.warn(this.pluginID, "Blocked Analytics.track call with arguments:", args);
                 });
                 this.verboseLog("Webpack Analytics Module patch applied");
             } else {
@@ -442,10 +442,10 @@ module.exports = class Paranoia {
             const NativeModule = BdApi.Webpack.getByKeys("getDiscordUtils");
 
             if (NativeModule?.ensureModule) {
-                BdApi.Patcher.instead(this.#pluginID, NativeModule, "ensureModule", (thisObject, args, originalFunction) => {
+                BdApi.Patcher.instead(this.pluginID, NativeModule, "ensureModule", (thisObject, args, originalFunction) => {
                     const [moduleName] = args;
                     if (moduleName?.includes("discord_rpc")) {
-                        BdApi.Logger.warn(this.#pluginID, `Blocked loading of native module: ${moduleName}`);
+                        BdApi.Logger.warn(this.pluginID, `Blocked loading of native module: ${moduleName}`);
                         return;
                     }
                     return originalFunction.apply(thisObject, args);
@@ -459,7 +459,7 @@ module.exports = class Paranoia {
             const noopedFunctions = ['submitLiveCrashReport'];
             for (const func of noopedFunctions) {
                 if (NativeModule?.[func]) {
-                    BdApi.Patcher.instead(this.#pluginID, NativeModule, func, (thisObject, args, originalFunction) => { BdApi.Logger.warn(this.#pluginID, `Blocked call to ${func} with arguments:`, args); });
+                    BdApi.Patcher.instead(this.pluginID, NativeModule, func, (thisObject, args, originalFunction) => { BdApi.Logger.warn(this.pluginID, `Blocked call to ${func} with arguments:`, args); });
                     this.verboseLog(`${func} patch applied`);
                 }
             }
@@ -487,7 +487,7 @@ module.exports = class Paranoia {
         // NOTE: should we override this function with a no-op if verbose mode is disabled?
 
         if (this.verboseMode) {
-            BdApi.Logger.info(this.#pluginID, ...args);
+            BdApi.Logger.info(this.pluginID, ...args);
         }
         // else {
         //     // TODO: one issue with overriding this with a no-op is that we cannot "undo" this as easily
@@ -503,13 +503,14 @@ module.exports = class Paranoia {
     }
 
     // TODO:: can we expose this as a setting for the user to, via the config window add more identifiers to block?
-    #trackingIdentifiers = [
+    trackingIdentifiers = [
         // NOTE: so far we only block discord own tracking endpoints
         /\/api\/v\d+\/(science|metrics|track)(\/v\d+)?/,
 
-        // DEBUG: are these even used?
-        //'googletagmanager.com',
-        //'cloudflareinsights.com'
+        // NOTE: this is an alternative way to specify string literals as identifiers
+        // string literals by default are handled with "fuzzy" matching (url.includes), but this allows us to specify them with "flat" matching (url === identifier) if needed
+        // { identifier: 'googletagmanager.com', match: 'flat' /* flat/fuzzy */ }, 
+        // { identifier: 'cloudflareinsights.com', match: 'flat' }, 
     ];
     getCacheKey(url) {
         try {
@@ -517,35 +518,54 @@ module.exports = class Paranoia {
             const urlObj = new URL(url);
             return `${urlObj.origin}${urlObj.pathname}`;
         } catch {
-            BdApi.Logger.warn(this.#pluginID, `Failed to parse URL for caching: ${url}. Using raw URL as cache key.`);
+            BdApi.Logger.warn(this.pluginID, `Failed to parse URL for caching: ${url}. Using raw URL as cache key.`);
             return url;
         }
     }
     isTrackingRequest(url) {
         const cacheKey = this.getCacheKey(url);
 
-        if (this.#trackingCache.has(cacheKey)) {
-            this.verboseLog(`Cache hit for URL: ${url} - isTracking: ${this.#trackingCache.get(cacheKey)}`);
-            return this.#trackingCache.get(cacheKey);
+        if (this.trackingCache.has(cacheKey)) {
+            this.verboseLog(`Cache hit for URL: ${url} - isTracking: ${this.trackingCache.get(cacheKey)}`);
+            return this.trackingCache.get(cacheKey);
         }
 
-        const isMatch = this.#trackingIdentifiers.some(identifier => {
-            if (typeof identifier === 'string') {
-                return url.includes(identifier);
+        const isMatch = this.trackingIdentifiers.some(identifier => {
+            switch (typeof identifier) {
+                case 'string':
+                    return url.includes(identifier);
+                case 'object':
+                    if (identifier instanceof RegExp) return identifier.test(url);
+                    else {
+                        if (typeof identifier.identifier === 'string' && typeof identifier.match === 'string') {
+                            switch (identifier.match) {
+                                case 'flat':
+                                    return url === identifier.identifier;
+                                case 'fuzzy':
+                                    return url.includes(identifier.identifier);
+                                default:
+                                    BdApi.Logger.warn(this.pluginID, `Invalid match type '${identifier.match}' for identifier '${identifier.identifier}'. Skipping this identifier.`);
+                                    return false;
+                            }
+                        }
+                        else {
+                            BdApi.Logger.warn(this.pluginID, `Invalid identifier object structure: ${JSON.stringify(identifier)}. Expected properties 'identifier' (string) and 'match' (string). Skipping this identifier.`);
+                            return false;
+                        }
+                    }
+                default:
+                    BdApi.Logger.warn(this.pluginID, `Invalid identifier type: ${typeof identifier}. Expected string or object (RegExp). Skipping this identifier.`);
+                    return false;
             }
-            if (identifier instanceof RegExp) {
-                return identifier.test(url);
-            }
-            return false;
         });
 
         this.verboseLog(`Cache miss for URL: ${url} - caching isTracking result '${isMatch}' to generic key: ${cacheKey}`);
-        this.#trackingCache.set(cacheKey, isMatch);
+        this.trackingCache.set(cacheKey, isMatch);
         if (this.cacheMaxSize > 0) {
-            if (this.#trackingCache.size > this.cacheMaxSize) {
+            if (this.trackingCache.size > this.cacheMaxSize) {
                 // Simple cache eviction: clear the entire cache when max size is exceeded
                 this.verboseLog(`Cache size exceeded max of ${this.cacheMaxSize}. Clearing cache.`);
-                this.#trackingCache.clear();
+                this.trackingCache.clear();
             }
         }
         return isMatch;
