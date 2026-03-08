@@ -2,7 +2,7 @@
  * @name Paranoia
  * @author TetteDev
  * @description A maintained/updated version of the now abandoned DoNotTrack plugin by Zerebos. This plugin will attempt to block as much tracking as possible.
- * @version 0.0.5
+ * @version 0.0.6
  * @source https://github.com/TetteDev/Paranoia
  */
 
@@ -234,7 +234,7 @@ module.exports = class Paranoia {
 
     overrideNetworking() {
         if (!this.featureToggles.network.enabled) {
-            this.verboseLog("Network blocking is disabled via feature toggles, skipping network overrides");
+            this.verboseLog(()=>`Network blocking is disabled via feature toggles, skipping network overrides`);
             return;
         }
 
@@ -260,7 +260,7 @@ module.exports = class Paranoia {
                     return originalFunction.apply(thisObject, args);
                 }
             });
-            this.verboseLog("Fetch patch applied");
+            this.verboseLog(()=>`Fetch patch applied`);
         }
 
         // NOTE: handle fetchLater
@@ -285,7 +285,7 @@ module.exports = class Paranoia {
                     return originalFunction.apply(thisObject, args);
                 }
             });
-            this.verboseLog("FetchLater patch applied");
+            this.verboseLog(()=>`FetchLater patch applied`);
         }
 
         // NOTE: handle XMLHttpRequest
@@ -314,7 +314,7 @@ module.exports = class Paranoia {
                     BdApi.Logger.error(this.pluginID, "Error in XHR open patch:", error);
                 }
             });
-            this.verboseLog("XHR open patch applied");
+            this.verboseLog(()=>`XHR open patch applied`);
 
             // XMLHttpRequest.send - Block marked requests
             BdApi.Patcher.instead(this.pluginID, XMLHttpRequest.prototype, "send", (thisObject, args, originalFunction) => {
@@ -338,7 +338,7 @@ module.exports = class Paranoia {
                     return originalFunction.apply(thisObject, args);
                 }
             });
-            this.verboseLog("XHR send patch applied");
+            this.verboseLog(()=>`XHR send patch applied`);
         }
         
         // NOTE: handle SendBeacon
@@ -360,12 +360,12 @@ module.exports = class Paranoia {
                     return originalFunction.apply(thisObject, args);
                 }
             });
-            this.verboseLog("sendBeacon patch applied");
+            this.verboseLog(()=>`sendBeacon patch applied`);
         }
     }
     overrideSentry() { 
         if (!this.featureToggles.sentry.enabled) {
-            this.verboseLog("Sentry blocking is disabled via feature toggles, skipping Sentry overrides");
+            this.verboseLog(()=>`Sentry blocking is disabled via feature toggles, skipping Sentry overrides`);
             return;
         }
 
@@ -381,7 +381,7 @@ module.exports = class Paranoia {
             if ('enable' in sentryLogger) {
                 const oEnable = sentryLogger.enable;
                 BdApi.Patcher.instead(this.pluginID, sentryLogger, "enable", (thisObject, args, originalFunction) => { });
-                this.verboseLog("Sentry logger.enable patched to no-op");
+                this.verboseLog(()=>`Sentry logger.enable patched to no-op`);
                 sentryLogger.enable.toString = function() { return oEnable.toString(); };
             }
 
@@ -433,11 +433,11 @@ module.exports = class Paranoia {
             sentryHub?.endSession();
         }
 
-        this.verboseLog("Sentry patch applied");
+        this.verboseLog(()=>`Sentry patch applied`);
     }
     overrideMisc() {
         if (!this.featureToggles.misc.enabled) {
-            this.verboseLog("Misc blocking is disabled via feature toggles, skipping misc overrides");
+            this.verboseLog(()=>`Misc blocking is disabled via feature toggles, skipping misc overrides`);
             return;
         }
 
@@ -449,9 +449,9 @@ module.exports = class Paranoia {
                 BdApi.Patcher.instead(this.pluginID, Analytics.default, "track", (thisObject, args, originalFunction) => {
                     BdApi.Logger.warn(this.pluginID, "Blocked Analytics.track call with arguments:", args);
                 });
-                this.verboseLog("Webpack Analytics Module patch applied");
+                this.verboseLog(()=>`Webpack Analytics Module patch applied`);
             } else {
-                this.verboseLog("Analytics module not found or has invalid structure");
+                BdApi.Logger.error(this.pluginID, `Analytics module not found or has invalid structure`);
             }
         }
 
@@ -467,9 +467,9 @@ module.exports = class Paranoia {
                     }
                     return originalFunction.apply(thisObject, args);
                 });
-                this.verboseLog("Webpack Native Module patch applied");
+                this.verboseLog(()=>`Webpack Native Module patch applied`);
             } else {
-                this.verboseLog("Native module not found or has invalid structure");
+                BdApi.Logger.error(this.pluginID, `Native module not found or has invalid structure`);
             }
 
             // DEBUG: anything below here is just a safety net
@@ -490,7 +490,7 @@ module.exports = class Paranoia {
     // TODO: unimplemented
     __linkCleaner() {
         if (!this.featureToggles.misc.linkCleaner) {
-            this.verboseLog("Link cleaner is disabled via feature toggles, skipping link cleaner override");
+            this.verboseLog(()=>`Link cleaner is disabled via feature toggles, skipping link cleaner override`);
             return;
         }
 
@@ -504,7 +504,7 @@ module.exports = class Paranoia {
         // BdApi.DOM.onAdded('a', cleanAnchor);
 
     
-        this.verboseLog("Link cleaning enabled");
+        this.verboseLog(()=>"Link cleaning enabled");
     }
 
     // TODO:: can we expose this as a setting for the user to, via the config window add more identifiers to block?
