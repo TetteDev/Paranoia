@@ -2,7 +2,7 @@
  * @name Paranoia
  * @author TetteDev
  * @description A maintained/updated version of the now abandoned DoNotTrack plugin by Zerebos. This plugin will attempt to block as much tracking as possible.
- * @version 0.0.6
+ * @version 0.0.7
  * @source https://github.com/TetteDev/Paranoia
  */
 
@@ -578,9 +578,8 @@ module.exports = class Paranoia {
         this.trackingCache.set(cacheKey, isMatch);
         if (this.cacheMaxSize > 0) {
             if (this.trackingCache.size > this.cacheMaxSize) {
-                // Simple cache eviction: clear the entire cache when max size is exceeded
                 this.verboseLog(()=>`Cache size exceeded max of ${this.cacheMaxSize}. Clearing cache.`);
-                this.trackingCache.clear();
+                this.trackingCache.delete(this.trackingCache.keys().next().value);
             }
         }
         return isMatch;
