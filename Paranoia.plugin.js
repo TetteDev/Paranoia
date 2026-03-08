@@ -2,7 +2,7 @@
  * @name Paranoia
  * @author TetteDev
  * @description A maintained/updated version of the now abandoned DoNotTrack plugin by Zerebos. This plugin will attempt to block as much tracking as possible.
- * @version 0.0.9
+ * @version 0.1.0
  * @source https://github.com/TetteDev/Paranoia
  */
 
@@ -305,7 +305,14 @@ module.exports = class Paranoia {
                         thisObject.__schizophreniaBlocked = true;
                         thisObject.__schizophreniaURL = urlString;
                         thisObject.__schizophreniaMethod = method;
-                        BdApi.Logger.warn(this.pluginID, `Marked XHR for blocking: ${method} ${urlString}`);
+                        thisObject.send = (body) => {
+                            BdApi.Logger.warn(this.pluginID, `Blocked XHR: ${thisObject.__schizophreniaMethod} ${thisObject.__schizophreniaURL}`);
+                            thisObject.abort();
+                            setTimeout(() => {
+                                const errorEvent = new ProgressEvent('error');
+                                thisObject.dispatchEvent(errorEvent);
+                            }, 16);
+                        };
                     }
                     else {
                         this.verboseLog(()=>`Allowed XHR: ${method} ${urlString}`);
@@ -314,31 +321,7 @@ module.exports = class Paranoia {
                     BdApi.Logger.error(this.pluginID, "Error in XHR open patch:", error);
                 }
             });
-            this.verboseLog(()=>`XHR open patch applied`);
-
-            // XMLHttpRequest.send - Block marked requests
-            BdApi.Patcher.instead(this.pluginID, XMLHttpRequest.prototype, "send", (thisObject, args, originalFunction) => {
-                try {
-                    if (thisObject.__schizophreniaBlocked) {
-                        BdApi.Logger.warn(this.pluginID, `Blocked XHR: ${thisObject.__schizophreniaMethod} ${thisObject.__schizophreniaURL}`);
-                        
-                        // Simulate network error
-                        setTimeout(() => {
-                            const errorEvent = new ProgressEvent('error');
-                            thisObject.dispatchEvent(errorEvent);
-                        }, 16);
-
-                        return; // Don't send
-                    }
-                    else {
-                        return originalFunction.apply(thisObject, args);
-                    }
-                } catch (error) {
-                    BdApi.Logger.error(this.pluginID, "Error in XHR send patch:", error);
-                    return originalFunction.apply(thisObject, args);
-                }
-            });
-            this.verboseLog(()=>`XHR send patch applied`);
+            this.verboseLog(()=>`XHR open&send patch applied`);
         }
         
         // NOTE: handle SendBeacon
