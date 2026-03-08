@@ -1,8 +1,9 @@
 /**
  * @name Paranoia
  * @author TetteDev
- * @description An maintained/updated version of the now abandoned DoNotTrack plugin by Zerebos. This plugin will attempt to block as much tracking as possible.
- * @version 0.0.1
+ * @description A maintained/updated version of the now abandoned DoNotTrack plugin by Zerebos. This plugin will attempt to block as much tracking as possible.
+ * @version 0.0.2
+ * @source https://github.com/TetteDev/Paranoia
  */
 
 module.exports = class Paranoia {
@@ -63,13 +64,11 @@ module.exports = class Paranoia {
         }
         return this.#defaultSettings;
     }
-
     saveSettings() {
         BdApi.Data.save(this.#pluginID, "settings", this.settings);
         this.verboseMode = this.settings.verboseMode;
         this.featureToggles = this.settings.featureToggles;
     }
-
     getSettingsPanel() {
         const settings = [
             {
@@ -222,6 +221,12 @@ module.exports = class Paranoia {
         this.overrideSentry();
         this.overrideMisc();
     }
+    stop() {
+        BdApi.Patcher.unpatchAll(this.#pluginID);
+        this.#trackingCache.clear();
+
+        BdApi.Logger.info(this.#pluginID, `Stopped Plugin`);
+    }
 
     overrideNetworking() {
         if (!this.featureToggles.network.enabled) {
@@ -354,7 +359,6 @@ module.exports = class Paranoia {
             this.verboseLog("sendBeacon patch applied");
         }
     }
-
     overrideSentry() { 
         if (!this.featureToggles.sentry.enabled) {
             this.verboseLog("Sentry blocking is disabled via feature toggles, skipping Sentry overrides");
@@ -414,7 +418,6 @@ module.exports = class Paranoia {
 
         this.verboseLog("Sentry patch applied");
     }
-
     overrideMisc() {
         if (!this.featureToggles.misc.enabled) {
             this.verboseLog("Misc blocking is disabled via feature toggles, skipping misc overrides");
@@ -422,7 +425,7 @@ module.exports = class Paranoia {
         }
 
         if (this.featureToggles.misc.webpackAnalyticsModule === true) {
-            // TODO: the entire analytics module deserves a closer look, there may be more tracking calls that need to be blocked beyond just the "track" function
+            // TODO: the entire analytics module deserves a closer look, there may be more tracking related stuff that need to be blocked beyond just the "track" function
 
             const Analytics = BdApi.Webpack.getByKeys("AnalyticEventConfigs");
             if (Analytics?.default?.track) {
@@ -467,7 +470,7 @@ module.exports = class Paranoia {
 
         this.__linkCleaner();
     }
-
+    // TODO: unimplemented
     __linkCleaner() {
         if (!this.featureToggles.misc.linkCleaner) {
             this.verboseLog("Link cleaner is disabled via feature toggles, skipping link cleaner override");
@@ -478,13 +481,6 @@ module.exports = class Paranoia {
         // performance will be very important here as this will likely be called on every single link in the app, so we need to make sure it's as efficient as possible
 
         this.verboseLog("Link cleaning enabled");
-    }
-
-    stop() {
-        BdApi.Patcher.unpatchAll(this.#pluginID);
-        this.#trackingCache.clear();
-
-        BdApi.Logger.info(this.#pluginID, `Stopped Plugin`);
     }
 
     verboseLog(...args) {
@@ -499,7 +495,6 @@ module.exports = class Paranoia {
         //     // his.verboseLog = function(...args) {};
         // }
     }
-
     normalizeURL(url) {
         if (typeof url === 'string') return url;
         if (url instanceof URL) return url.href;
@@ -516,7 +511,6 @@ module.exports = class Paranoia {
         //'googletagmanager.com',
         //'cloudflareinsights.com'
     ];
-
     getCacheKey(url) {
         try {
             // NOTE: using a more generic cache key that ignores parameters/fragments to decrease cache misses
@@ -527,7 +521,6 @@ module.exports = class Paranoia {
             return url;
         }
     }
-
     isTrackingRequest(url) {
         const cacheKey = this.getCacheKey(url);
 
