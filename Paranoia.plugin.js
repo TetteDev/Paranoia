@@ -2,23 +2,25 @@
  * @name Paranoia
  * @author TetteDev
  * @description A maintained/updated version of the now abandoned DoNotTrack plugin by Zerebos. This plugin will attempt to block as much tracking as possible.
- * @version 0.0.3
+ * @version 0.0.5
  * @source https://github.com/TetteDev/Paranoia
  */
 
 module.exports = class Paranoia {
+    // NOTE: populated inside constructor
     pluginID = null;
     trackingCache = null;
     defaultSettings = null;
+    settings = null;
+    // trackingIdentifiers = null;
 
     constructor(meta) {
         this.pluginID = meta.name;
         this.trackingCache = new Map();
-
         this.defaultSettings = {
             verboseMode: false, // be bombarded with logs
 
-            cacheMaxSize: 256, // -1 for unbounded, or set a positive integer for max cache size
+            cacheMaxSize: 512, // -1 for unbounded, or set a positive integer for max cache size
 
             featureToggles: {
                 network: {
@@ -66,8 +68,10 @@ module.exports = class Paranoia {
     }
     saveSettings() {
         BdApi.Data.save(this.pluginID, "settings", this.settings);
+
         this.verboseMode = this.settings.verboseMode;
         this.featureToggles = this.settings.featureToggles;
+        this.cacheMaxSize = this.settings.cacheMaxSize;
     }
     getSettingsPanel() {
         const settings = [
@@ -193,18 +197,18 @@ module.exports = class Paranoia {
                     const [catName, settingName] = id.split('.');
                     if (settingName) {
                         this.settings.featureToggles[catName][settingName] = value;
-                        this.verboseLog(`Updated setting: ${catName}.${settingName} = ${value}`);
+                        this.verboseLog(()=>`Updated setting: ${catName}.${settingName} = ${value}`);
                     }
                 } else {
                     this.settings[id] = value;
-                    this.verboseLog(`Updated setting: ${id} = ${value}`);
+                    this.verboseLog(()=>`Updated setting: ${id} = ${value}`);
                 }
                 
                 this.saveSettings();
                 
                 BdApi.Logger.info(this.pluginID, `Setting changed: ${category ? category + '.' : ''}${id} = ${value}`);
                 
-                // TODO: any sentry related changes probably dont need a restart, but why the hell not
+                // TODO: any sentry related changes probably dont need a restart
                 // if (id === "sentry.enabled") {
                 //     BdApi.UI.showToast("Sentry changes require a Discord restart to fully take effect.", { type: "warning", timeout: 5000 });
                 // } else {
@@ -240,7 +244,7 @@ module.exports = class Paranoia {
                 try {
                     const [url, options] = args;
                     const urlString = this.normalizeURL(url);
-                    this.verboseLog(`fetch called with URL: ${urlString}`);
+                    this.verboseLog(()=>`fetch called with URL: ${urlString}`);
 
                     const isTracking = this.isTrackingRequest(urlString);
                     if (isTracking) {
@@ -248,7 +252,7 @@ module.exports = class Paranoia {
                         return Promise.reject(new Error("Blocked tracking request"));
                     }
                     else {
-                        this.verboseLog(`Allowed fetch: ${urlString}`);
+                        this.verboseLog(()=>`Allowed fetch: ${urlString}`);
                         return originalFunction.apply(thisObject, args);
                     }
                 } catch (error) {
@@ -265,7 +269,7 @@ module.exports = class Paranoia {
                 try {
                     const [url, options] = args;
                     const urlString = this.normalizeURL(url);
-                    this.verboseLog(`fetchLater called with URL: ${urlString}`);
+                    this.verboseLog(()=>`fetchLater called with URL: ${urlString}`);
 
                     const isTracking = this.isTrackingRequest(urlString);
                     if (isTracking) {
@@ -273,7 +277,7 @@ module.exports = class Paranoia {
                         return Promise.reject(new Error("Blocked tracking request"));
                     }
                     else {
-                        this.verboseLog(`Allowed fetchLater: ${urlString}`);
+                        this.verboseLog(()=>`Allowed fetchLater: ${urlString}`);
                         return originalFunction.apply(thisObject, args);
                     }
                 } catch (error) {
@@ -294,7 +298,7 @@ module.exports = class Paranoia {
                 try {
                     const [method, url] = args;
                     const urlString = this.normalizeURL(url);
-                    this.verboseLog(`XHR open called with URL: ${urlString}`);
+                    this.verboseLog(()=>`XHR open called with URL: ${urlString}`);
 
                     const isTracking = this.isTrackingRequest(urlString);
                     if (isTracking) {
@@ -304,7 +308,7 @@ module.exports = class Paranoia {
                         BdApi.Logger.warn(this.pluginID, `Marked XHR for blocking: ${method} ${urlString}`);
                     }
                     else {
-                        this.verboseLog(`Allowed XHR: ${method} ${urlString}`);
+                        this.verboseLog(()=>`Allowed XHR: ${method} ${urlString}`);
                     }
                 } catch (error) {
                     BdApi.Logger.error(this.pluginID, "Error in XHR open patch:", error);
@@ -343,7 +347,7 @@ module.exports = class Paranoia {
                 try {
                     const [url, data] = args;
                     const urlString = this.normalizeURL(url);
-                    this.verboseLog(`sendBeacon called with URL: ${urlString}`);
+                    this.verboseLog(()=>`sendBeacon called with URL: ${urlString}`);
                     
                     if (this.isTrackingRequest(urlString)) {
                         BdApi.Logger.warn(this.pluginID, `Blocked sendBeacon: ${urlString}`);
@@ -376,7 +380,8 @@ module.exports = class Paranoia {
 
             if ('enable' in sentryLogger) {
                 const oEnable = sentryLogger.enable;
-                sentryLogger.enable = function() {};
+                BdApi.Patcher.instead(this.pluginID, sentryLogger, "enable", (thisObject, args, originalFunction) => { });
+                this.verboseLog("Sentry logger.enable patched to no-op");
                 sentryLogger.enable.toString = function() { return oEnable.toString(); };
             }
 
@@ -385,7 +390,10 @@ module.exports = class Paranoia {
                 const isLoggingFunction = method in console;
                 if (isLoggingFunction) {
                     const oMethod = sentryLogger[method];
+
+                    // TODO: use bdapi patcher instead of doing it like this
                     sentryLogger[method] = console[method];
+                    this.verboseLog(()=>`Sentry logger.${method} patched to use original console.${method}`);
                     sentryLogger[method].toString = function() { return oMethod.toString(); };
                 }
             }
@@ -394,13 +402,22 @@ module.exports = class Paranoia {
         // NOTE: Legacy code, they no longer store original references like this, but we restore them just in case
         for (const method in console) {
             if (!Object.hasOwn(console[method], "__sentry_original__")) continue;
+
+            // TODO: use bdapi patcher instead of doing it like this
             console[method] = console[method].__sentry_original__;
+            //this.verboseLog(()=>`Restoring console.${method} from __sentry_original__`);
         }
 
         if (sentryInstance && Object.hasOwn(sentryInstance, 'globalScope')) {
             const sentryGlobalEventProcessors = sentryInstance.globalScope?._eventProcessors;
             if (Array.isArray(sentryGlobalEventProcessors)) {
                 sentryGlobalEventProcessors.splice(0, sentryGlobalEventProcessors.length);
+
+                // TODO: is preventing new event processors from being added necessary? probably not, but why the hell not
+                sentryGlobalEventProcessors.push = function(...items) {
+                    BdApi.Logger.warn(this.pluginID, "Blocked attempt to add new Sentry global event processor:", items);
+                    return;
+                };
             }
         }
 
@@ -460,7 +477,7 @@ module.exports = class Paranoia {
             for (const func of noopedFunctions) {
                 if (NativeModule?.[func]) {
                     BdApi.Patcher.instead(this.pluginID, NativeModule, func, (thisObject, args, originalFunction) => { BdApi.Logger.warn(this.pluginID, `Blocked call to ${func} with arguments:`, args); });
-                    this.verboseLog(`${func} patch applied`);
+                    this.verboseLog(()=>`${func} patch applied`);
                 }
             }
 
@@ -479,27 +496,15 @@ module.exports = class Paranoia {
 
         // TODO: implement link cleaning here
         // performance will be very important here as this will likely be called on every single link in the app, so we need to make sure it's as efficient as possible
+        // const cleanAnchor = (anchor) => {
+        //     if (!(anchor instanceof HTMLAnchorElement)) return;
 
+        //     anchor.href = 'bla bla bla cleaned';
+        // };
+        // BdApi.DOM.onAdded('a', cleanAnchor);
+
+    
         this.verboseLog("Link cleaning enabled");
-    }
-
-    verboseLog(...args) {
-        // NOTE: should we override this function with a no-op if verbose mode is disabled?
-
-        if (this.verboseMode) {
-            BdApi.Logger.info(this.pluginID, ...args);
-        }
-        // else {
-        //     // TODO: one issue with overriding this with a no-op is that we cannot "undo" this as easily
-        //     // if the user enables verbose mode again
-        //     // his.verboseLog = function(...args) {};
-        // }
-    }
-    normalizeURL(url) {
-        if (typeof url === 'string') return url;
-        if (url instanceof URL) return url.href;
-        if (url instanceof Request) return url.url;
-        return String(url);
     }
 
     // TODO:: can we expose this as a setting for the user to, via the config window add more identifiers to block?
@@ -522,12 +527,19 @@ module.exports = class Paranoia {
             return url;
         }
     }
+    normalizeURL(url) {
+        if (typeof url === 'string') return url;
+        if (url instanceof URL) return url.href;
+        if (url instanceof Request) return url.url;
+        return String(url);
+    }
     isTrackingRequest(url) {
         const cacheKey = this.getCacheKey(url);
+        const lookupResult = this.trackingCache.get(cacheKey);
 
-        if (this.trackingCache.has(cacheKey)) {
-            this.verboseLog(`Cache hit for URL: ${url} - isTracking: ${this.trackingCache.get(cacheKey)}`);
-            return this.trackingCache.get(cacheKey);
+        if (lookupResult !== undefined) {
+            this.verboseLog(()=>`Cache hit for URL: ${url} - isTracking: ${lookupResult}`);
+            return lookupResult;
         }
 
         const isMatch = this.trackingIdentifiers.some(identifier => {
@@ -538,36 +550,47 @@ module.exports = class Paranoia {
                     if (identifier instanceof RegExp) return identifier.test(url);
                     else {
                         if (typeof identifier.identifier === 'string' && typeof identifier.match === 'string') {
+                            const caseInsensitive = typeof identifier.caseInsensitive === 'boolean' ? identifier.caseInsensitive : false;
                             switch (identifier.match) {
                                 case 'flat':
-                                    return url === identifier.identifier;
+                                    // TODO: should flat mode be case insensitive by default?
+                                    return caseInsensitive ? url.toLowerCase() === identifier.identifier.toLowerCase() : url === identifier.identifier;
                                 case 'fuzzy':
-                                    return url.includes(identifier.identifier);
+                                    // TODO: should fuzzy mode be case insensitive by default?
+                                    return caseInsensitive ? url.toLowerCase().includes(identifier.identifier.toLowerCase()) : url.includes(identifier.identifier);
                                 default:
-                                    BdApi.Logger.warn(this.pluginID, `Invalid match type '${identifier.match}' for identifier '${identifier.identifier}'. Skipping this identifier.`);
+                                    BdApi.Logger.error(this.pluginID, `Invalid match type '${identifier.match}' for identifier '${identifier.identifier}'. Skipping this identifier.`);
                                     return false;
                             }
                         }
                         else {
-                            BdApi.Logger.warn(this.pluginID, `Invalid identifier object structure: ${JSON.stringify(identifier)}. Expected properties 'identifier' (string) and 'match' (string). Skipping this identifier.`);
+                            BdApi.Logger.error(this.pluginID, `Invalid identifier object structure: ${JSON.stringify(identifier)}. Expected properties 'identifier' (string) and 'match' (string). Skipping this identifier.`);
                             return false;
                         }
                     }
                 default:
-                    BdApi.Logger.warn(this.pluginID, `Invalid identifier type: ${typeof identifier}. Expected string or object (RegExp). Skipping this identifier.`);
+                    BdApi.Logger.error(this.pluginID, `Invalid identifier type: ${typeof identifier}. Expected string or object (RegExp). Skipping this identifier.`);
                     return false;
             }
         });
 
-        this.verboseLog(`Cache miss for URL: ${url} - caching isTracking result '${isMatch}' to generic key: ${cacheKey}`);
+        this.verboseLog(()=>`Cache miss for URL: ${url} - caching isTracking result '${isMatch}' to generic key: ${cacheKey}`);
         this.trackingCache.set(cacheKey, isMatch);
         if (this.cacheMaxSize > 0) {
             if (this.trackingCache.size > this.cacheMaxSize) {
                 // Simple cache eviction: clear the entire cache when max size is exceeded
-                this.verboseLog(`Cache size exceeded max of ${this.cacheMaxSize}. Clearing cache.`);
+                this.verboseLog(()=>`Cache size exceeded max of ${this.cacheMaxSize}. Clearing cache.`);
                 this.trackingCache.clear();
             }
         }
         return isMatch;
+    }
+
+    verboseLog(lazyMessageFn) {
+        // NOTE: should we override this function with a no-op if verbose mode is disabled?
+
+        if (this.verboseMode) {
+            BdApi.Logger.info(this.pluginID, lazyMessageFn());
+        }
     }
 };
