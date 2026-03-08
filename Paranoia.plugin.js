@@ -2,7 +2,7 @@
  * @name Paranoia
  * @author TetteDev
  * @description A maintained/updated version of the now abandoned DoNotTrack plugin by Zerebos. This plugin will attempt to block as much tracking as possible.
- * @version 0.0.8
+ * @version 0.0.9
  * @source https://github.com/TetteDev/Paranoia
  */
 
@@ -267,7 +267,7 @@ module.exports = class Paranoia {
         if (this.featureToggles.network.fetchLater === true && typeof window.fetchLater === 'function') {
             BdApi.Patcher.instead(this.pluginID, window, "fetchLater", (thisObject, args, originalFunction) => {
                 try {
-                    const url = args[0];
+                    const url = typeof args[0] === 'string' ? args[0] /* fetchLater was called with a string as the url */ : args[0].url /* fetchLater was called with a Request object */;
                     const urlString = this.normalizeURL(url);
                     this.verboseLog(()=>`fetchLater called with URL: ${urlString}`);
 
@@ -542,6 +542,7 @@ module.exports = class Paranoia {
             return lookupResult;
         }
 
+        // FIXME: try to eliminate the type checking (with some sort of cache?)
         const isMatch = this.trackingIdentifiers.some(identifier => {
             switch (typeof identifier) {
                 case 'string':
@@ -590,6 +591,7 @@ module.exports = class Paranoia {
     // message and log it, its a little bit less elegant but it would avoid unnecessary allocations
     verboseLog(lazyMessageFn) {
         // NOTE: should we override this function with a no-op if verbose mode is disabled?
+        // a good place to do it would probably be in our saveSettings function, where we can check if verbose mode is enabled and then assign this.verboseLog to either a real logging function or a no-op function
 
         if (this.verboseMode) {
             BdApi.Logger.info(this.pluginID, lazyMessageFn());
