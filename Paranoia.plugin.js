@@ -2,7 +2,7 @@
  * @name Paranoia
  * @author TetteDev
  * @description A maintained/updated version of the now abandoned DoNotTrack plugin by Zerebos. This plugin will attempt to block as much tracking as possible.
- * @version 0.1.1
+ * @version 0.1.3
  * @source https://github.com/TetteDev/Paranoia
  */
 
@@ -242,7 +242,7 @@ module.exports = class Paranoia {
         if (this.featureToggles.network.fetch === true) {
             BdApi.Patcher.instead(this.pluginID, window, "fetch", (thisObject, args, originalFunction) => {
                 try {
-                    const url = typeof args[0] === 'string' ? args[0] /* fetch was called with a string as the url */ : args[0].url /* fetch was called with a Request object */;
+                    const url = args[0];
                     const urlString = this.normalizeURL(url);
                     this.verboseLog(()=>`fetch called with URL: ${urlString}`);
 
@@ -267,7 +267,7 @@ module.exports = class Paranoia {
         if (this.featureToggles.network.fetchLater === true && typeof window.fetchLater === 'function') {
             BdApi.Patcher.instead(this.pluginID, window, "fetchLater", (thisObject, args, originalFunction) => {
                 try {
-                    const url = typeof args[0] === 'string' ? args[0] /* fetchLater was called with a string as the url */ : args[0].url /* fetchLater was called with a Request object */;
+                    const url = args[0];
                     const urlString = this.normalizeURL(url);
                     this.verboseLog(()=>`fetchLater called with URL: ${urlString}`);
 
@@ -305,6 +305,7 @@ module.exports = class Paranoia {
                         thisObject.__schizophreniaBlocked = true;
                         thisObject.__schizophreniaURL = urlString;
                         thisObject.__schizophreniaMethod = method;
+
                         thisObject.send = (body) => {
                             BdApi.Logger.warn(this.pluginID, `Blocked XHR: ${thisObject.__schizophreniaMethod} ${thisObject.__schizophreniaURL}`);
                             
@@ -339,7 +340,7 @@ module.exports = class Paranoia {
                     
                     if (this.isTrackingRequest(urlString)) {
                         BdApi.Logger.warn(this.pluginID, `Blocked sendBeacon: ${urlString}`);
-                        return false;
+                        return true;
                     }
                     
                     return originalFunction.apply(thisObject, args);
@@ -563,11 +564,11 @@ module.exports = class Paranoia {
             }
         });
 
-        this.verboseLog(()=>`Cache miss for URL: ${url} - caching isTracking result '${isMatch}' to generic key: ${cacheKey}`);
+        this.verboseLog(()=>`Cache miss for URL: ${url} - caching isTracking result '${isMatch}' to generic key: ${cacheKey}`, 'warn');
         this.trackingCache.set(cacheKey, isMatch);
         if (this.cacheMaxSize > 0) {
             if (this.trackingCache.size > this.cacheMaxSize) {
-                this.verboseLog(()=>`Cache size exceeded max of ${this.cacheMaxSize}. Clearing cache.`);
+                this.verboseLog(()=>`Cache size exceeded max of ${this.cacheMaxSize}. Clearing cache.`, 'warn');
                 this.trackingCache.delete(this.trackingCache.keys().next().value);
             }
         }
@@ -577,12 +578,10 @@ module.exports = class Paranoia {
     // FIXME: still allocates a closure for the log message, which is better than what we had before but still not ideal
     // a zero overhead solution would be to inline check if verbose mode is enabled and then proceed to construct our 
     // message and log it, its a little bit less elegant but it would avoid unnecessary allocations
-    verboseLog(lazyMessageFn) {
-        // NOTE: should we override this function with a no-op if verbose mode is disabled?
-        // a good place to do it would probably be in our saveSettings function, where we can check if verbose mode is enabled and then assign this.verboseLog to either a real logging function or a no-op function
-
+    verboseLog(lazyMessageFn, type = 'info') {
         if (this.verboseMode) {
-            BdApi.Logger.info(this.pluginID, lazyMessageFn());
+            // TODO: clamp the log type to valid console methods
+            BdApi.Logger[type](this.pluginID, lazyMessageFn());
         }
     }
 };
